@@ -271,7 +271,7 @@ const IMAGE_FOLDER = "Bilder/";
 /* Texte der Karten (Reihenfolge = Bild 1, 2, 3, …).
    Fehlen Einträge, bleibt die Leiste der jeweiligen Karte leer. */
 const CARD_TEXTS = [
-    "HALLO!",
+    "We all started somewhere.",
     "Kartentext 2",
     "Kartentext 3",
     "Kartentext 4",
@@ -283,28 +283,28 @@ const CARD_TEXTS = [
 
 /* Die drei Intro-Texte (jeweils ein Tap) */
 const INTRO_TEXTS = [
-    "Hello, Linda",
+    "Hello, Linda!",
     "TEXT_2",
     "TEXT_3"
 ];
 
 /* Die drei Abschlusstexte (jeweils ein Tap) */
 const OUTRO_TEXTS = [
-    "TEXT_4",
-    "TEXT_5",
-    "TEXT_6"
+    "Lorem Ipsum, bla bla bla, ganz langer Text zum testen, ganz viele Zeichen, um zu schauen, wie es aussieht.",
+    "Lorem Ipsum, bla bla bla, ganz langer Text zum testen, ganz viele Zeichen, um zu schauen, wie es aussieht.",
+    "Lorem Ipsum, bla bla bla, ganz langer Text zum testen, ganz viele Zeichen, um zu schauen, wie es aussieht."
 ];
 
 /* Interaktion */
 const TAP_COOLDOWN_MS = 500;      // Sperrzeit nach jedem Tap
 
 /* Wort-Animation */
-const WORD_STAGGER_MS = 380;       // Zeitversatz pro Wort (kleiner als die
+const WORD_STAGGER_MS = 200;       // Zeitversatz pro Wort (kleiner als die
                                    // Dauer → Wörter überlappen sich fließend)
 
 /* Karten-Stapel: Zufallsbereiche für ein natürliches Bild */
-const CARD_OFFSET_X_MAX  = 18;     // max. horizontale Verschiebung (px)
-const CARD_OFFSET_Y_MAX  = 14;     // max. vertikale Verschiebung (px)
+const CARD_OFFSET_X_MAX  = 50;     // max. horizontale Verschiebung (px)
+const CARD_OFFSET_Y_MAX  = 50;     // max. vertikale Verschiebung (px)
 const CARD_ROTATION_MAX  = 7;      // max. Endrotation (Grad)
 const CARD_START_ROT_MAX = 16;     // max. Rotation während des Falls (Grad)
 
