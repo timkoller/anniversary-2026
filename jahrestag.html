@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Für Linda</title>
+
+<!-- Schriftarten: Lora (moderne Serif mit normalen Proportionen für die großen
+     Texte) + Outfit (geometrische Sans für die Kartenleisten) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   ZENTRALE DESIGN-KONFIGURATION (Farben, Größen, Abstände)
+   ============================================================ */
+:root {
+    /* Farben */
+    --color-bg:            #F3EBDF;   /* Pastellfarbenes Beige (Hintergrund) */
+    --color-text:          #5A4F42;   /* Warmes, dunkles Braun für Texte */
+    --color-card-border:   rgba(90, 79, 66, 0.14);
+    --color-card-bar:      rgba(255, 253, 248, 0.42);  /* Frosted-Glass-Leiste */
+    --color-card-bar-text: #4A4238;
+    --color-shadow:        rgba(90, 70, 45, 0.22);
+
+    /* Typografie */
+    --font-display: "Lora", "Georgia", serif;
+    --font-ui:      "Outfit", "Helvetica Neue", sans-serif;
+    --text-size:    clamp(1.9rem, 8.5vw, 3rem);        /* Größe der großen Texte */
+    --text-gap:     clamp(1.1rem, 4.5vh, 2.2rem);      /* Abstand zwischen Textzeilen */
+
+    /* Karten */
+    --card-width:   min(72vw, 330px);                  /* Kartenbreite (schmaler als Screen) */
+    --card-radius:  22px;                              /* Eckenradius */
+    --card-bar-height: 3.4rem;                         /* Höhe der Textleiste */
+
+    /* Animations-Dauern (mit den JS-Werten abgestimmt) */
+    --word-duration:  1100ms;   /* Dauer der Wort-Einblendung */
+    --word-blur:      18px;     /* Start-Unschärfe der Wörter */
+    --card-fall-duration:  950ms;   /* Fallanimation einer Karte */
+    --card-sweep-duration: 900ms;   /* Wegschieben der Karten */
+    --text-fadeout:   700ms;    /* Ausblenden der ersten Texte */
+
+    /* Easing-Kurven */
+    --ease-out-soft:   cubic-bezier(0.22, 1, 0.36, 1);       /* weiches Auslaufen */
+    --ease-land:       cubic-bezier(0.3, 1.28, 0.42, 1);     /* Landen mit sanftem Nachfedern */
+    --ease-sweep:      cubic-bezier(0.6, 0.04, 0.25, 1);     /* beschleunigen, weich ausklingen */
+}
+
+/* ============================================================
+   GRUNDLAYOUT
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;                 /* kein Scrollen – alles auf einem Screen */
+}
+
+body {
+    background: var(--color-bg);
+    font-family: var(--font-display);
+    color: var(--color-text);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;       /* verhindert Doppeltipp-Zoom */
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+}
+
+/* Bühne: füllt den sichtbaren Bereich (dvh = korrekt auf iOS/Android) */
+#stage {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+/* ============================================================
+   TEXT-EBENEN (Intro- und Abschlusstexte)
+   ============================================================ */
+.text-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: var(--text-gap);
+    padding: 0 6vw;
+    text-align: center;
+    transition: opacity var(--text-fadeout) var(--ease-out-soft),
+                filter  var(--text-fadeout) var(--ease-out-soft);
+    pointer-events: none;
+}
+
+/* Intro-Texte werden vor dem Kartenteil sanft ausgeblendet */
+.text-layer.is-hidden {
+    opacity: 0;
+    filter: blur(10px);
+}
+
+.text-line {
+    font-size: var(--text-size);
+    font-weight: 400;
+    letter-spacing: 0.005em;
+    line-height: 1.3;
+}
+
+/* Einzelne Wörter: starten unsichtbar + stark unscharf */
+.word {
+    display: inline-block;
+    opacity: 0;
+    filter: blur(var(--word-blur));
+    transform: translateY(0.35em);
+    will-change: opacity, filter, transform;
+}
+
+/* Wird per JS gesetzt; --d = individuelle Verzögerung pro Wort.
+   Durch die Überlappung (Verzögerung < Dauer) beginnt Wort 2,
+   während Wort 1 noch schärfer wird. */
+.word.is-visible {
+    animation: word-in var(--word-duration) var(--ease-out-soft) forwards;
+    animation-delay: var(--d, 0ms);
+}
+
+@keyframes word-in {
+    to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   KARTEN
+   ============================================================ */
+#card-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+.card {
+    position: absolute;
+    width: var(--card-width);
+    aspect-ratio: 1 / 1;              /* quadratisch */
+    border-radius: var(--card-radius);
+    border: 1px solid var(--color-card-border);
+    box-shadow: 0 18px 45px -12px var(--color-shadow),
+                0 4px 10px -4px var(--color-shadow);
+    overflow: hidden;
+    background: #E8DECF;
+    will-change: transform;
+
+    /* Endposition auf dem Stapel – wird pro Karte per JS gesetzt */
+    transform: translate(var(--x, 0px), var(--y, 0px))
+               rotate(var(--r, 0deg))
+               scale(1);
+    transition: transform var(--card-fall-duration) var(--ease-land);
+}
+
+/* Startzustand: außerhalb des Bildschirms oben, leicht gedreht,
+   minimal vergrößert (wirkt näher an der "Kamera") */
+.card.is-falling {
+    transform: translate(var(--x, 0px), -120vh)
+               rotate(var(--r-start, 0deg))
+               scale(1.08);
+    transition: none;
+}
+
+/* Wegschieben nach links/rechts */
+.card.is-swept {
+    transform: translate(var(--sweep-x), calc(var(--y, 0px) + var(--sweep-y, 0px)))
+               rotate(var(--sweep-r))
+               scale(1);
+    transition: transform var(--card-sweep-duration) var(--ease-sweep);
+    transition-delay: var(--sweep-delay, 0ms);
+}
+
+.card img,
+.card .card-fallback {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Dezenter Platzhalter, falls ein Bild (noch) fehlt */
+.card .card-fallback {
+    background: linear-gradient(145deg, #EFE4D3, #DED0BC);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: var(--font-ui);
+    font-weight: 300;
+    color: rgba(90, 79, 66, 0.45);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+}
+
+/* Halbtransparente Frosted-Glass-Leiste am unteren Rand */
+.card-bar {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: var(--card-bar-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    background: var(--color-card-bar);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.card-bar span {
+    font-family: var(--font-ui);
+    font-weight: 400;
+    font-size: 0.92rem;
+    letter-spacing: 0.02em;
+    color: var(--color-card-bar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ============================================================
+   REDUZIERTE BEWEGUNG (Barrierefreiheit)
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    .word.is-visible { animation-duration: 250ms; }
+    .card,
+    .card.is-swept   { transition-duration: 250ms; }
+    .text-layer      { transition-duration: 250ms; }
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+    <!-- Erste Textgruppe (wird vor den Karten wieder ausgeblendet) -->
+    <div class="text-layer" id="intro-texts"></div>
+
+    <!-- Kartenstapel -->
+    <div id="card-layer"></div>
+
+    <!-- Abschlusstexte -->
+    <div class="text-layer" id="outro-texts"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   ZENTRALE KONFIGURATION
+   ============================================================ */
+
+/* Anzahl der Karten: lädt automatisch Bilder/1.png … Bilder/N.png */
+const NUMBER_OF_CARDS = 8;
+
+/* Ordner mit den Bildern */
+const IMAGE_FOLDER = "Bilder/";
+
+/* Texte der Karten (Reihenfolge = Bild 1, 2, 3, …).
+   Fehlen Einträge, bleibt die Leiste der jeweiligen Karte leer. */
+const CARD_TEXTS = [
+    "HALLO!",
+    "Kartentext 2",
+    "Kartentext 3",
+    "Kartentext 4",
+    "Kartentext 5",
+    "Kartentext 6",
+    "Kartentext 7",
+    "Kartentext 8"
+];
+
+/* Die drei Intro-Texte (jeweils ein Tap) */
+const INTRO_TEXTS = [
+    "Hello, Linda",
+    "TEXT_2",
+    "TEXT_3"
+];
+
+/* Die drei Abschlusstexte (jeweils ein Tap) */
+const OUTRO_TEXTS = [
+    "TEXT_4",
+    "TEXT_5",
+    "TEXT_6"
+];
+
+/* Interaktion */
+const TAP_COOLDOWN_MS = 500;      // Sperrzeit nach jedem Tap
+
+/* Wort-Animation */
+const WORD_STAGGER_MS = 380;       // Zeitversatz pro Wort (kleiner als die
+                                   // Dauer → Wörter überlappen sich fließend)
+
+/* Karten-Stapel: Zufallsbereiche für ein natürliches Bild */
+const CARD_OFFSET_X_MAX  = 18;     // max. horizontale Verschiebung (px)
+const CARD_OFFSET_Y_MAX  = 14;     // max. vertikale Verschiebung (px)
+const CARD_ROTATION_MAX  = 7;      // max. Endrotation (Grad)
+const CARD_START_ROT_MAX = 16;     // max. Rotation während des Falls (Grad)
+
+/* Wegschieben der Karten */
+const SWEEP_STAGGER_MS   = 45;     // Verzögerung pro Karte (oberste zuerst)
+const SWEEP_EXTRA_ROT    = 24;     // zusätzliche Rotation beim Rausschieben (Grad)
+
+
+/* ============================================================
+   HILFSFUNKTIONEN
+   ============================================================ */
+
+/** Zufallszahl im Bereich [min, max] */
+const rand = (min, max) => min + Math.random() * (max - min);
+
+/** Zufallszahl im Bereich [-max, +max] */
+const randSpread = (max) => rand(-max, max);
+
+
+/* ============================================================
+   TEXT-ANIMATION
+   ============================================================ */
+
+/**
+ * Baut alle Textzeilen einer Gruppe vorab in den Container
+ * (Wörter starten unsichtbar). Dadurch verschiebt sich das Layout
+ * später nicht mehr, wenn weitere Zeilen erscheinen.
+ */
+function buildTextGroup(container, texts) {
+    texts.forEach(text => {
+        const line = document.createElement("div");
+        line.className = "text-line";
+
+        text.split(/\s+/).forEach((wordText, i) => {
+            const word = document.createElement("span");
+            word.className = "word";
+            word.textContent = wordText;
+            /* Individueller Zeitversatz → überlappende Einblendung */
+            word.style.setProperty("--d", `${i * WORD_STAGGER_MS}ms`);
+            line.appendChild(word);
+
+            /* Normales Leerzeichen zwischen den Wörtern */
+            if (i < text.split(/\s+/).length - 1) {
+                line.appendChild(document.createTextNode(" "));
+            }
+        });
+
+        container.appendChild(line);
+    });
+}
+
+/** Startet die Wort-Animation der Zeile mit dem gegebenen Index. */
+function revealTextLine(container, index) {
+    const line = container.children[index];
+    if (!line) return;
+    line.querySelectorAll(".word").forEach(w => w.classList.add("is-visible"));
+}
+
+
+/* ============================================================
+   KARTEN
+   ============================================================ */
+
+const cardLayer = document.getElementById("card-layer");
+const cards = [];   // Referenzen aller Karten (für das Wegschieben)
+
+/** Erstellt eine Karte und lässt sie auf den Stapel fallen. */
+function dropCard(index) {
+    const card = document.createElement("div");
+    card.className = "card is-falling";
+    card.style.zIndex = String(index + 1);   // neue Karte liegt immer oben
+
+    /* Zufällige Endposition/-rotation → natürlicher Stapel */
+    card.style.setProperty("--x", `${randSpread(CARD_OFFSET_X_MAX)}px`);
+    card.style.setProperty("--y", `${randSpread(CARD_OFFSET_Y_MAX)}px`);
+    card.style.setProperty("--r", `${randSpread(CARD_ROTATION_MAX)}deg`);
+    card.style.setProperty("--r-start", `${randSpread(CARD_START_ROT_MAX)}deg`);
+
+    /* Bild */
+    const img = document.createElement("img");
+    img.src = `${IMAGE_FOLDER}${index + 1}.png`;
+    img.alt = "";
+    img.draggable = false;
+    /* Dezenter Platzhalter, falls das Bild fehlt */
+    img.addEventListener("error", () => {
+        const fallback = document.createElement("div");
+        fallback.className = "card-fallback";
+        fallback.textContent = `Bild ${index + 1}`;
+        img.replaceWith(fallback);
+    });
+    card.appendChild(img);
+
+    /* Frosted-Glass-Leiste mit Text */
+    const bar = document.createElement("div");
+    bar.className = "card-bar";
+    const barText = document.createElement("span");
+    barText.textContent = CARD_TEXTS[index] ?? "";
+    bar.appendChild(barText);
+    card.appendChild(bar);
+
+    cardLayer.appendChild(card);
+    cards.push(card);
+
+    /* Zwei Frames warten, damit der Startzustand sicher gerendert ist,
+       dann in die Endposition übergehen (CSS-Transition übernimmt). */
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => card.classList.remove("is-falling"));
+    });
+}
+
+/** Schiebt alle Karten abwechselnd nach links und rechts hinaus. */
+function sweepCards() {
+    /* Oberste Karte zuerst – wirkt wie ein Auseinanderschieben
+       des Stapels mit beiden Händen. */
+    [...cards].reverse().forEach((card, i) => {
+        const direction = i % 2 === 0 ? 1 : -1;   // abwechselnd rechts/links
+
+        card.style.setProperty("--sweep-x", `${direction * 120}vw`);
+        card.style.setProperty("--sweep-y", `${randSpread(30)}px`);
+        card.style.setProperty(
+            "--sweep-r",
+            `${direction * rand(SWEEP_EXTRA_ROT * 0.5, SWEEP_EXTRA_ROT)}deg`
+        );
+        card.style.setProperty("--sweep-delay", `${i * SWEEP_STAGGER_MS}ms`);
+        card.classList.add("is-swept");
+    });
+}
+
+/** Lädt alle Kartenbilder im Hintergrund vor. */
+function preloadImages() {
+    for (let i = 1; i <= NUMBER_OF_CARDS; i++) {
+        new Image().src = `${IMAGE_FOLDER}${i}.png`;
+    }
+}
+
+
+/* ============================================================
+   ABLAUFSTEUERUNG (State Machine)
+   ============================================================
+   Schrittfolge (jeweils ein Tap):
+     0 … 2                → Intro-Texte 1–3
+     3 … 3+N-1            → Karten 1–N (erste Karte blendet Intro aus)
+     3+N                  → Karten wegschieben
+     3+N+1 … 3+N+3        → Abschlusstexte 4–6
+     danach               → Ende, keine Reaktion mehr
+   ============================================================ */
+
+const introContainer = document.getElementById("intro-texts");
+const outroContainer = document.getElementById("outro-texts");
+
+const STEP_CARDS_START = INTRO_TEXTS.length;
+const STEP_SWEEP       = STEP_CARDS_START + NUMBER_OF_CARDS;
+const STEP_OUTRO_START = STEP_SWEEP + 1;
+const STEP_END         = STEP_OUTRO_START + OUTRO_TEXTS.length;
+
+let currentStep = 0;
+let lastTapTime = -Infinity;
+
+function handleTap() {
+    /* Ende erreicht → keine Reaktion mehr */
+    if (currentStep >= STEP_END) return;
+
+    /* Cooldown: während der Sperrzeit werden Taps ignoriert */
+    const now = performance.now();
+    if (now - lastTapTime < TAP_COOLDOWN_MS) return;
+    lastTapTime = now;
+
+    if (currentStep < STEP_CARDS_START) {
+        /* Intro-Texte 1–3 */
+        revealTextLine(introContainer, currentStep);
+
+    } else if (currentStep < STEP_SWEEP) {
+        /* Karten: vor der ersten Karte die Intro-Texte ausblenden */
+        if (currentStep === STEP_CARDS_START) {
+            introContainer.classList.add("is-hidden");
+        }
+        dropCard(currentStep - STEP_CARDS_START);
+
+    } else if (currentStep === STEP_SWEEP) {
+        /* Stapel auseinanderschieben */
+        sweepCards();
+
+    } else {
+        /* Abschlusstexte 4–6 */
+        revealTextLine(outroContainer, currentStep - STEP_OUTRO_START);
+    }
+
+    currentStep++;
+}
+
+
+/* ============================================================
+   INITIALISIERUNG
+   ============================================================ */
+
+buildTextGroup(introContainer, INTRO_TEXTS);
+buildTextGroup(outroContainer, OUTRO_TEXTS);
+preloadImages();
+
+/* Der gesamte Bildschirm ist die Eingabefläche.
+   "pointerdown" reagiert sofort (kein 300-ms-Klick-Delay). */
+document.addEventListener("pointerdown", handleTap);
+</script>
+
+</body>
+</html>
