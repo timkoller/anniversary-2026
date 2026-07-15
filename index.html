@@ -9,7 +9,7 @@
      Texte) + Outfit (geometrische Sans für die Kartenleisten) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
 /* ============================================================
@@ -19,6 +19,7 @@
     /* Farben */
     --color-bg:            #F3EBDF;   /* Pastellfarbenes Beige (Hintergrund) */
     --color-text:          #5A4F42;   /* Warmes, dunkles Braun für Texte */
+    --color-accent:        #B96A4B;   /* Akzentfarbe für hervorgehobene Wörter */
     --color-card-border:   rgba(90, 79, 66, 0.14);
     --color-card-bar:      rgba(255, 253, 248, 0.42);  /* Frosted-Glass-Leiste */
     --color-card-bar-text: #4A4238;
@@ -35,12 +36,21 @@
     --card-radius:  22px;                              /* Eckenradius */
     --card-bar-height: 3.4rem;                         /* Höhe der Textleiste */
 
+    /* Text unter dem Kartenstapel */
+    --stack-shift:  -7vh;                              /* Stapel nach oben verschieben */
+    --caption-gap:  6.0vh;                             /* vertikaler Abstand zwischen
+                                                          Kartenunterkante und Stapeltext */
+    --caption-size: clamp(1.15rem, 5vw, 1.5rem);       /* Größe des Stapeltextes */
+    --card-max-y-offset: 0px;                          /* wird beim Start aus JS gesetzt
+                                                          (= CARD_OFFSET_Y_MAX) */
+
     /* Animations-Dauern (mit den JS-Werten abgestimmt) */
     --word-duration:  1100ms;   /* Dauer der Wort-Einblendung */
     --word-blur:      18px;     /* Start-Unschärfe der Wörter */
     --card-fall-duration:  950ms;   /* Fallanimation einer Karte */
     --card-sweep-duration: 900ms;   /* Wegschieben der Karten */
     --text-fadeout:   700ms;    /* Ausblenden der ersten Texte */
+    --caption-fade:   450ms;    /* Wechsel des Stapeltextes */
 
     /* Easing-Kurven */
     --ease-out-soft:   cubic-bezier(0.22, 1, 0.36, 1);       /* weiches Auslaufen */
@@ -133,6 +143,42 @@ body {
     }
 }
 
+/* Hervorgehobene Wörter (Markup: *Wort* in den Textdefinitionen) */
+.word--em {
+    font-weight: 600;
+    color: var(--color-accent);
+}
+
+/* ============================================================
+   TEXT UNTER DEM KARTENSTAPEL
+   ============================================================ */
+#caption-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    /* Oberkante: Mitte + Stapelverschiebung + halbe Kartenhöhe
+       + maximaler vertikaler Kartenversatz + einstellbarer Abstand */
+    top: calc(50% + var(--stack-shift) + var(--card-width) / 2
+              + var(--card-max-y-offset) + var(--caption-gap));
+    display: grid;                /* alte + neue Zeile überlagern sich beim Wechsel */
+    justify-items: center;
+    padding: 0 7vw;
+    text-align: center;
+    pointer-events: none;
+}
+
+#caption-layer .text-line {
+    grid-area: 1 / 1;             /* alle Zeilen in derselben Zelle (Überblendung) */
+    font-size: var(--caption-size);
+}
+
+#caption-layer .text-line.is-leaving {
+    transition: opacity var(--caption-fade) var(--ease-out-soft),
+                filter  var(--caption-fade) var(--ease-out-soft);
+    opacity: 0;
+    filter: blur(8px);
+}
+
 /* ============================================================
    KARTEN
    ============================================================ */
@@ -142,6 +188,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Stapel etwas nach oben, damit Karte + Text gemeinsam zentriert wirken */
+    transform: translateY(var(--stack-shift));
     pointer-events: none;
 }
 
@@ -239,6 +287,7 @@ body {
     .card,
     .card.is-swept   { transition-duration: 250ms; }
     .text-layer      { transition-duration: 250ms; }
+    #caption-layer .text-line { transition-duration: 250ms; }
 }
 </style>
 </head>
@@ -250,6 +299,9 @@ body {
 
     <!-- Kartenstapel -->
     <div id="card-layer"></div>
+
+    <!-- Text unter dem Kartenstapel (Kartenphase) -->
+    <div id="caption-layer"></div>
 
     <!-- Abschlusstexte -->
     <div class="text-layer" id="outro-texts"></div>
@@ -281,9 +333,29 @@ const CARD_TEXTS = [
     "Kartentext 8"
 ];
 
+/* Texte, die während der Kartenphase unter dem Stapel erscheinen
+   (einer pro Karte, unabhängig vom Text in der Kartenleiste) */
+const CARD_CAPTION_TEXTS = [
+    "Hallo, das ist ein *Test*!",
+    "Stapeltext 2",
+    "Stapeltext 3",
+    "Stapeltext 4",
+    "Stapeltext 5",
+    "Stapeltext 6",
+    "Stapeltext 7",
+    "Stapeltext 8"
+];
+
+/* Hervorhebungen: In allen Texten (INTRO_TEXTS, OUTRO_TEXTS und
+   CARD_CAPTION_TEXTS) können einzelne Wörter mit Sternchen markiert
+   werden, z. B. "zwei *wundervolle* Jahre". Markierte Wörter erscheinen
+   fett und in der Akzentfarbe (--color-accent, oben im CSS).
+   Hinweis: Satzzeichen direkt am Wort mit in die Sternchen nehmen
+   ("*Linda!*" statt "*Linda*!"). */
+
 /* Die drei Intro-Texte (jeweils ein Tap) */
 const INTRO_TEXTS = [
-    "Hello, Linda!",
+    "Hello, *Linda!*",
     "TEXT_2",
     "TEXT_3"
 ];
@@ -303,10 +375,15 @@ const WORD_STAGGER_MS = 200;       // Zeitversatz pro Wort (kleiner als die
                                    // Dauer → Wörter überlappen sich fließend)
 
 /* Karten-Stapel: Zufallsbereiche für ein natürliches Bild */
-const CARD_OFFSET_X_MAX  = 50;     // max. horizontale Verschiebung (px)
-const CARD_OFFSET_Y_MAX  = 50;     // max. vertikale Verschiebung (px)
-const CARD_ROTATION_MAX  = 7;      // max. Endrotation (Grad)
+const CARD_OFFSET_X_MAX  = 15;     // max. horizontale Verschiebung (px)
+const CARD_OFFSET_Y_MAX  = 15;     // max. vertikale Verschiebung (px)
+const CARD_ROTATION_MIN  = 2;      // min. Endrotation (Grad) – macht den
+                                   // Links-rechts-Wechsel sichtbar
+const CARD_ROTATION_MAX  = 6;      // max. Endrotation (Grad)
 const CARD_START_ROT_MAX = 16;     // max. Rotation während des Falls (Grad)
+
+/* Text unter dem Stapel */
+const CAPTION_DELAY_MS = 250;      // Pause zwischen Landung der Karte und Text
 
 /* Wegschieben der Karten */
 const SWEEP_STAGGER_MS   = 45;     // Verzögerung pro Karte (oberste zuerst)
@@ -323,10 +400,59 @@ const rand = (min, max) => min + Math.random() * (max - min);
 /** Zufallszahl im Bereich [-max, +max] */
 const randSpread = (max) => rand(-max, max);
 
+/** Liest eine Zeitangabe (z. B. "950ms" oder "0.95s") aus einer CSS-Variablen. */
+function cssTimeMs(varName) {
+    const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(varName).trim();
+    return value.endsWith("ms") ? parseFloat(value) : parseFloat(value) * 1000;
+}
+
 
 /* ============================================================
    TEXT-ANIMATION
    ============================================================ */
+
+/**
+ * Zerlegt einen Text in Wörter. Mit Sternchen markierte Abschnitte
+ * (z. B. "zwei *wundervolle* Jahre") werden als hervorgehoben markiert.
+ */
+function parseWords(text) {
+    const words = [];
+    text.split(/(\*[^*]+\*)/).forEach(part => {
+        if (!part) return;
+        const em = part.startsWith("*") && part.endsWith("*");
+        const clean = em ? part.slice(1, -1) : part;
+        clean.split(/\s+/).filter(Boolean)
+             .forEach(w => words.push({ text: w, em }));
+    });
+    return words;
+}
+
+/**
+ * Baut eine einzelne Textzeile mit animierbaren Wort-Spans.
+ * Wird für Intro-/Abschlusstexte und die Stapeltexte verwendet.
+ */
+function buildTextLine(text) {
+    const line = document.createElement("div");
+    line.className = "text-line";
+
+    const words = parseWords(text);
+    words.forEach((word, i) => {
+        const span = document.createElement("span");
+        span.className = word.em ? "word word--em" : "word";
+        span.textContent = word.text;
+        /* Individueller Zeitversatz → überlappende Einblendung */
+        span.style.setProperty("--d", `${i * WORD_STAGGER_MS}ms`);
+        line.appendChild(span);
+
+        /* Normales Leerzeichen zwischen den Wörtern */
+        if (i < words.length - 1) {
+            line.appendChild(document.createTextNode(" "));
+        }
+    });
+
+    return line;
+}
 
 /**
  * Baut alle Textzeilen einer Gruppe vorab in den Container
@@ -334,26 +460,7 @@ const randSpread = (max) => rand(-max, max);
  * später nicht mehr, wenn weitere Zeilen erscheinen.
  */
 function buildTextGroup(container, texts) {
-    texts.forEach(text => {
-        const line = document.createElement("div");
-        line.className = "text-line";
-
-        text.split(/\s+/).forEach((wordText, i) => {
-            const word = document.createElement("span");
-            word.className = "word";
-            word.textContent = wordText;
-            /* Individueller Zeitversatz → überlappende Einblendung */
-            word.style.setProperty("--d", `${i * WORD_STAGGER_MS}ms`);
-            line.appendChild(word);
-
-            /* Normales Leerzeichen zwischen den Wörtern */
-            if (i < text.split(/\s+/).length - 1) {
-                line.appendChild(document.createTextNode(" "));
-            }
-        });
-
-        container.appendChild(line);
-    });
+    texts.forEach(text => container.appendChild(buildTextLine(text)));
 }
 
 /** Startet die Wort-Animation der Zeile mit dem gegebenen Index. */
@@ -370,6 +477,7 @@ function revealTextLine(container, index) {
 
 const cardLayer = document.getElementById("card-layer");
 const cards = [];   // Referenzen aller Karten (für das Wegschieben)
+let nextRotationDir = Math.random() < 0.5 ? 1 : -1;   // Startrichtung zufällig
 
 /** Erstellt eine Karte und lässt sie auf den Stapel fallen. */
 function dropCard(index) {
@@ -377,10 +485,15 @@ function dropCard(index) {
     card.className = "card is-falling";
     card.style.zIndex = String(index + 1);   // neue Karte liegt immer oben
 
-    /* Zufällige Endposition/-rotation → natürlicher Stapel */
+    /* Zufällige Endposition → natürlicher Stapel */
     card.style.setProperty("--x", `${randSpread(CARD_OFFSET_X_MAX)}px`);
     card.style.setProperty("--y", `${randSpread(CARD_OFFSET_Y_MAX)}px`);
-    card.style.setProperty("--r", `${randSpread(CARD_ROTATION_MAX)}deg`);
+
+    /* Endrotation: Richtung wechselt bei jeder Karte (links ↔ rechts),
+       nur der Winkelbetrag ist zufällig */
+    const rotation = nextRotationDir * rand(CARD_ROTATION_MIN, CARD_ROTATION_MAX);
+    nextRotationDir *= -1;
+    card.style.setProperty("--r", `${rotation}deg`);
     card.style.setProperty("--r-start", `${randSpread(CARD_START_ROT_MAX)}deg`);
 
     /* Bild */
@@ -413,10 +526,21 @@ function dropCard(index) {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => card.classList.remove("is-falling"));
     });
+
+    /* Alten Stapeltext sofort ausblenden; den neuen erst zeigen,
+       wenn die Karte gelandet ist (plus kurze Verzögerung). */
+    hideCaption();
+    captionTimer = setTimeout(
+        () => showCaption(index),
+        cssTimeMs("--card-fall-duration") + CAPTION_DELAY_MS
+    );
 }
 
 /** Schiebt alle Karten abwechselnd nach links und rechts hinaus. */
 function sweepCards() {
+    /* Letzten Stapeltext mit ausblenden */
+    hideCaption();
+
     /* Oberste Karte zuerst – wirkt wie ein Auseinanderschieben
        des Stapels mit beiden Händen. */
     [...cards].reverse().forEach((card, i) => {
@@ -438,6 +562,33 @@ function preloadImages() {
     for (let i = 1; i <= NUMBER_OF_CARDS; i++) {
         new Image().src = `${IMAGE_FOLDER}${i}.png`;
     }
+}
+
+
+/* ============================================================
+   TEXT UNTER DEM KARTENSTAPEL
+   ============================================================ */
+
+const captionLayer = document.getElementById("caption-layer");
+let captionTimer = null;   // geplante Einblendung (wird bei neuem Tap verworfen)
+
+/** Blendet den aktuellen Stapeltext aus und verwirft geplante Einblendungen. */
+function hideCaption() {
+    clearTimeout(captionTimer);
+    [...captionLayer.children].forEach(line => {
+        line.classList.add("is-leaving");
+        setTimeout(() => line.remove(), cssTimeMs("--caption-fade"));
+    });
+}
+
+/** Zeigt den Stapeltext der Karte mit dem gegebenen Index (Wort-Animation). */
+function showCaption(index) {
+    const text = CARD_CAPTION_TEXTS[index] ?? "";
+    if (!text) return;
+
+    const line = buildTextLine(text);
+    captionLayer.appendChild(line);
+    line.querySelectorAll(".word").forEach(w => w.classList.add("is-visible"));
 }
 
 
@@ -499,6 +650,12 @@ function handleTap() {
 /* ============================================================
    INITIALISIERUNG
    ============================================================ */
+
+/* Maximalen vertikalen Kartenversatz ans CSS übergeben, damit der
+   Stapeltext auch bei großem CARD_OFFSET_Y_MAX unter den Karten bleibt */
+document.documentElement.style.setProperty(
+    "--card-max-y-offset", `${CARD_OFFSET_Y_MAX}px`
+);
 
 buildTextGroup(introContainer, INTRO_TEXTS);
 buildTextGroup(outroContainer, OUTRO_TEXTS);
