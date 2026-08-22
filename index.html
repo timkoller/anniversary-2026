@@ -21,7 +21,7 @@
     --color-text:          #5A4F42;   /* Warmes, dunkles Braun für Texte */
     --color-accent:        #B96A4B;   /* Akzentfarbe für hervorgehobene Wörter */
     --color-card-border:   rgba(90, 79, 66, 0.14);
-    --color-card-bar:      rgba(255, 253, 248, 0.42);  /* Frosted-Glass-Leiste */
+    --color-card-bar:      rgba(255, 253, 248, 0.88);  /* Frosted-Glass-Leiste (hohe Deckkraft für Lesbarkeit auf dunklen Bildern) */
     --color-card-bar-text: #4A4238;
     --color-shadow:        rgba(90, 70, 45, 0.22);
 
@@ -274,6 +274,7 @@ body {
     font-size: 0.92rem;
     letter-spacing: 0.02em;
     color: var(--color-card-bar-text);
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -315,22 +316,32 @@ body {
    ============================================================ */
 
 /* Anzahl der Karten: lädt automatisch Bilder/1.png … Bilder/N.png */
-const NUMBER_OF_CARDS = 8;
+const NUMBER_OF_CARDS = 14;
 
 /* Ordner mit den Bildern */
 const IMAGE_FOLDER = "Bilder/";
 
+/* Erlaubte Dateiendungen, die pro Bildnummer der Reihe nach probiert
+   werden (erster Treffer gewinnt) */
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "PNG", "JPG", "JPEG"];
+
 /* Texte der Karten (Reihenfolge = Bild 1, 2, 3, …).
    Fehlen Einträge, bleibt die Leiste der jeweiligen Karte leer. */
 const CARD_TEXTS = [
-    "We all started somewhere.",
-    "Kartentext 2",
-    "Kartentext 3",
-    "Kartentext 4",
-    "Kartentext 5",
-    "Kartentext 6",
-    "Kartentext 7",
-    "Kartentext 8"
+    "7. Jul 2024",
+    "18. Jul 2024",
+    "26. Jul 2024",
+    "30. Aug 2024",
+    "13. Sep 2024",
+    "18. Dez 2024",
+    "8. Feb 2025",
+    "14. Feb 2025",
+    "15. Feb 2025",
+    "2. Mär 2025",
+    "28. Aug 2025",
+    "14. Feb 2026",
+    "2. Mär 2026",
+    "8. Jul 2026"
 ];
 
 /* Texte, die während der Kartenphase unter dem Stapel erscheinen
@@ -496,18 +507,26 @@ function dropCard(index) {
     card.style.setProperty("--r", `${rotation}deg`);
     card.style.setProperty("--r-start", `${randSpread(CARD_START_ROT_MAX)}deg`);
 
-    /* Bild */
+    /* Bild: probiert der Reihe nach alle IMAGE_EXTENSIONS durch */
     const img = document.createElement("img");
-    img.src = `${IMAGE_FOLDER}${index + 1}.png`;
     img.alt = "";
     img.draggable = false;
-    /* Dezenter Platzhalter, falls das Bild fehlt */
-    img.addEventListener("error", () => {
-        const fallback = document.createElement("div");
-        fallback.className = "card-fallback";
-        fallback.textContent = `Bild ${index + 1}`;
-        img.replaceWith(fallback);
-    });
+    let extAttempt = 0;
+    const tryNextExtension = () => {
+        if (extAttempt >= IMAGE_EXTENSIONS.length) {
+            const fallback = document.createElement("div");
+            fallback.className = "card-fallback";
+            fallback.textContent = `Bild ${index + 1}`;
+            img.replaceWith(fallback);
+            return;
+        }
+        img.src = `${IMAGE_FOLDER}${index + 1}.${IMAGE_EXTENSIONS[extAttempt]}`;
+        extAttempt++;
+    };
+    /* Nächste Endung probieren, falls das Bild fehlt; erst nach
+       Erschöpfen aller Endungen der Platzhalter */
+    img.addEventListener("error", tryNextExtension);
+    tryNextExtension();
     card.appendChild(img);
 
     /* Frosted-Glass-Leiste mit Text */
@@ -557,10 +576,19 @@ function sweepCards() {
     });
 }
 
-/** Lädt alle Kartenbilder im Hintergrund vor. */
+/** Lädt alle Kartenbilder im Hintergrund vor (probiert je Bildnummer
+    der Reihe nach alle IMAGE_EXTENSIONS durch, bis eine lädt). */
 function preloadImages() {
     for (let i = 1; i <= NUMBER_OF_CARDS; i++) {
-        new Image().src = `${IMAGE_FOLDER}${i}.png`;
+        let extAttempt = 0;
+        const tryNextExtension = () => {
+            if (extAttempt >= IMAGE_EXTENSIONS.length) return;
+            const preloadImg = new Image();
+            preloadImg.addEventListener("error", tryNextExtension);
+            preloadImg.src = `${IMAGE_FOLDER}${i}.${IMAGE_EXTENSIONS[extAttempt]}`;
+            extAttempt++;
+        };
+        tryNextExtension();
     }
 }
 
