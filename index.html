@@ -21,7 +21,7 @@
     --color-text:          #5A4F42;   /* Warmes, dunkles Braun für Texte */
     --color-accent:        #B96A4B;   /* Akzentfarbe für hervorgehobene Wörter */
     --color-card-border:   rgba(90, 79, 66, 0.14);
-    --color-card-bar:      rgba(255, 253, 248, 0.88);  /* Frosted-Glass-Leiste (hohe Deckkraft für Lesbarkeit auf dunklen Bildern) */
+    --color-card-bar:      rgba(255, 253, 248, 0.5);   /* Frosted-Glass-Leiste */
     --color-card-bar-text: #4A4238;
     --color-shadow:        rgba(90, 70, 45, 0.22);
 
@@ -263,8 +263,8 @@ body {
     justify-content: center;
     padding: 0 1rem;
     background: var(--color-card-bar);
-    backdrop-filter: blur(12px) saturate(1.2);
-    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.3) brightness(1.6);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3) brightness(1.6);
     border-top: 1px solid rgba(255, 255, 255, 0.45);
 }
 
